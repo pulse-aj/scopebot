@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Product Request Bot"
+version = "1.0.0"
+id = "artifacts/product-requests"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22233
+
+[services.development]
+run = "pnpm --filter @workspace/product-requests run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/product-requests", "run", "build" ]
+publicDir = "artifacts/product-requests/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22233"
+BASE_PATH = "/"

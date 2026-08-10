@@ -1,0 +1,2117 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: me
+    description: Current user
+  - name: conversations
+    description: Chat conversations with the product manager AI
+  - name: feature-requests
+    description: Finalized feature requests (kanban)
+  - name: admin
+    description: Admin-only views
+  - name: engineering
+    description: Engineering tasks, engineer-AI chat, and customer question drafts (admin-only)
+  - name: github
+    description: GitHub integration — repo / branch / PR lookups for engineering tasks (admin-only)
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [me]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          description: Unauthorized
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [conversations]
+      summary: List the current user's conversations
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConversationSummary"
+    post:
+      operationId: createConversation
+      tags: [conversations]
+      summary: Start a new conversation with the AI product manager
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConversationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [conversations]
+      summary: Get a conversation with all messages and attachments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "404":
+          description: Not found
+
+  /conversations/{id}/messages:
+    post:
+      operationId: sendMessage
+      tags: [conversations]
+      summary: Send a user message and receive an AI reply
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "200":
+          description: Updated conversation including the AI reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "404":
+          description: Not found
+
+  /conversations/{id}/attachments:
+    post:
+      operationId: uploadAttachment
+      tags: [conversations]
+      summary: Upload a file attachment to a conversation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachmentInput"
+      responses:
+        "201":
+          description: Attachment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attachment"
+        "404":
+          description: Not found
+
+  /conversations/{id}/finalize:
+    post:
+      operationId: finalizeConversation
+      tags: [conversations]
+      summary: Have the AI synthesize a feature request from the conversation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Feature request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureRequest"
+        "404":
+          description: Not found
+
+  /feature-requests:
+    get:
+      operationId: listFeatureRequests
+      tags: [feature-requests]
+      summary: List the current user's feature requests (kanban data)
+      responses:
+        "200":
+          description: List of feature requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FeatureRequest"
+
+  /feature-requests/{id}:
+    get:
+      operationId: getFeatureRequest
+      tags: [feature-requests]
+      summary: Get a single feature request (owner or admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Feature request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureRequest"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateFeatureRequest
+      tags: [feature-requests]
+      summary: Update a feature request (status, priority)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeatureRequestUpdate"
+      responses:
+        "200":
+          description: Updated feature request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureRequest"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteFeatureRequest
+      tags: [feature-requests]
+      summary: Delete a feature request and its underlying conversation (owner or admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /feature-requests/{id}/versions:
+    get:
+      operationId: listFeatureRequestVersions
+      tags: [feature-requests]
+      summary: List the version history of a feature request (owner or admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Versions, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FeatureRequestVersion"
+        "404":
+          description: Not found
+
+  /feature-requests/{id}/resynthesize:
+    post:
+      operationId: resynthesizeFeatureRequest
+      tags: [feature-requests]
+      summary: Re-run the AI to update the requirements doc with the latest conversation context
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated feature request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureRequest"
+        "404":
+          description: Not found
+
+  /admin/feature-requests:
+    get:
+      operationId: adminListFeatureRequests
+      tags: [admin]
+      summary: Admin — list all feature requests across all users
+      responses:
+        "200":
+          description: All feature requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FeatureRequest"
+        "403":
+          description: Forbidden
+
+  /admin/ai-prioritization:
+    get:
+      operationId: adminGetAiPrioritization
+      tags: [admin]
+      summary: Admin — get the latest AI-generated priority ranking of "requested" feature requests
+      responses:
+        "200":
+          description: Ranked list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiPrioritization"
+        "403":
+          description: Forbidden
+
+  /admin/ai-prioritization/refresh:
+    post:
+      operationId: adminRefreshAiPrioritization
+      tags: [admin]
+      summary: Admin — start a new AI priority ranking run in the background
+      description: Returns immediately with the current snapshot (isRunning=true). Poll GET /admin/ai-prioritization until isRunning flips to false and generatedAt has advanced.
+      responses:
+        "202":
+          description: Run started in the background
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiPrioritization"
+        "403":
+          description: Forbidden
+        "409":
+          description: A run is already in progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiPrioritization"
+
+  /admin/conversations/{id}:
+    get:
+      operationId: adminGetConversation
+      tags: [admin]
+      summary: Admin — get any conversation with full transcript
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /admin/conversations/{id}/messages:
+    post:
+      operationId: adminPostMessage
+      tags: [admin]
+      summary: Admin — post a clarifying question into a user's conversation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminMessageInput"
+      responses:
+        "200":
+          description: Updated conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: Admin — list known users (for assignee pickers)
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSummary"
+        "403":
+          description: Forbidden
+
+  /admin/team-members:
+    get:
+      operationId: listTeamMembers
+      tags: [admin]
+      summary: Admin — list team member email allowlist (admins + engineers)
+      responses:
+        "200":
+          description: Team members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamMember"
+        "403":
+          description: Forbidden
+    post:
+      operationId: addTeamMember
+      tags: [admin]
+      summary: Admin — add a teammate email with admin or engineer role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamMemberInput"
+      responses:
+        "200":
+          description: Team member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMember"
+        "400":
+          description: Invalid input
+        "403":
+          description: Forbidden
+        "409":
+          description: Already exists
+
+  /admin/team-members/{id}:
+    delete:
+      operationId: removeTeamMember
+      tags: [admin]
+      summary: Admin — remove a teammate from the allowlist
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "400":
+          description: Cannot remove the last admin
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /feature-requests/{id}/tasks:
+    get:
+      operationId: listEngineeringTasks
+      tags: [engineering]
+      summary: List engineering tasks for a feature request (admin-only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EngineeringTask"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    post:
+      operationId: createEngineeringTask
+      tags: [engineering]
+      summary: Create an engineering task for a feature request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EngineeringTaskInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngineeringTask"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /engineering-tasks/{id}:
+    patch:
+      operationId: updateEngineeringTask
+      tags: [engineering]
+      summary: Update an engineering task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EngineeringTaskUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngineeringTask"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteEngineeringTask
+      tags: [engineering]
+      summary: Delete an engineering task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /engineering-tasks/{id}/messages:
+    get:
+      operationId: listEngineeringTaskMessages
+      tags: [engineering]
+      summary: List engineer-AI chat for a task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EngineeringTaskMessage"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    post:
+      operationId: postEngineeringTaskMessage
+      tags: [engineering]
+      summary: Engineer posts a message — AI responds, possibly drafting a customer question
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EngineeringTaskMessageInput"
+      responses:
+        "200":
+          description: Updated thread (engineer message + AI response)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EngineeringTaskMessage"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /feature-requests/{id}/customer-question-drafts:
+    get:
+      operationId: listCustomerQuestionDrafts
+      tags: [engineering]
+      summary: List customer question drafts for a feature request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Drafts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomerQuestionDraft"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /customer-question-drafts/{id}/approve:
+    post:
+      operationId: approveCustomerQuestionDraft
+      tags: [engineering]
+      summary: Approve a drafted customer question (optionally edited) and post it to the customer conversation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerQuestionDraftApproval"
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerQuestionDraft"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /customer-question-drafts/{id}/reject:
+    post:
+      operationId: rejectCustomerQuestionDraft
+      tags: [engineering]
+      summary: Reject a drafted customer question
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerQuestionDraft"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /github/repos:
+    get:
+      operationId: listGithubRepos
+      tags: [github]
+      summary: List repositories the connected GitHub account can access
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Optional substring filter on owner/name.
+      responses:
+        "200":
+          description: Repositories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GithubRepo" }
+        "403":
+          description: Forbidden
+        "502":
+          description: GitHub integration error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GithubError" }
+
+  /github/branches:
+    get:
+      operationId: listGithubBranches
+      tags: [github]
+      summary: List branches for a repo
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema: { type: string }
+          description: owner/repo
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Branches
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GithubBranch" }
+        "403":
+          description: Forbidden
+        "502":
+          description: GitHub integration error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GithubError" }
+
+  /github/pulls:
+    get:
+      operationId: listGithubPulls
+      tags: [github]
+      summary: List pull requests for a repo
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema: { type: string }
+          description: owner/repo
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Pulls
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GithubPull" }
+        "403":
+          description: Forbidden
+        "502":
+          description: GitHub integration error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GithubError" }
+
+  /engineering-tasks/{id}/refresh-pr-state:
+    post:
+      operationId: refreshEngineeringTaskPrState
+      tags: [engineering]
+      summary: Refetch the PR state from GitHub and persist it on the task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EngineeringTask" }
+        "400":
+          description: Task has no PR URL or URL is not parseable
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+        "502":
+          description: GitHub integration error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GithubError" }
+
+  /admin/engineering-space:
+    get:
+      operationId: adminEngineeringSpace
+      tags: [admin]
+      summary: Admin — Paperclip-backed Engineering Space (requests, child tasks, agents, scheduler status)
+      responses:
+        "200":
+          description: Engineering Space payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngineeringSpace"
+        "403":
+          description: Forbidden
+
+  /admin/engineering-space/refresh:
+    post:
+      operationId: adminEngineeringSpaceRefresh
+      tags: [admin]
+      summary: Admin — trigger an immediate Paperclip push + poll
+      responses:
+        "202":
+          description: Refresh acknowledged. Body reports whether each loop was started or already busy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngineeringSpaceRefreshAck"
+        "403":
+          description: Forbidden
+
+  /admin/engineering-space/{id}/retry-push:
+    post:
+      operationId: adminRetryPaperclipPush
+      tags: [admin]
+      summary: Admin — clear failure markers on one feature request and immediately re-push it to Paperclip. The only way to re-attempt after a failed push (the scheduler never auto-retries).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Push succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, paperclipIssueId]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  paperclipIssueId: { type: string }
+        "409":
+          description: Row missing, not planned, or already successfully pushed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+        "502":
+          description: Paperclip returned an error or was unreachable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, error]
+                properties:
+                  ok: { type: boolean, enum: [false] }
+                  error: { type: string }
+        "403":
+          description: Forbidden
+
+  /admin/engineering-space/{id}/retry-notion-push:
+    post:
+      operationId: adminRetryNotionPush
+      tags: [admin]
+      summary: Admin — clear Notion failure markers on one human-routed feature request and immediately re-create its Notion page. The only way to re-attempt after a failed push (the scheduler never auto-retries).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Push succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, notionPageId]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  notionPageId: { type: string }
+        "409":
+          description: Row missing or already successfully pushed to Notion
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+        "502":
+          description: Notion returned an error or was unreachable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, error]
+                properties:
+                  ok: { type: boolean, enum: [false] }
+                  error: { type: string }
+        "403":
+          description: Forbidden
+
+  /admin/stats:
+    get:
+      operationId: adminStats
+      tags: [admin]
+      summary: Admin — aggregate stats across all feature requests
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+        "403":
+          description: Forbidden
+
+  /todos:
+    get:
+      operationId: listTodos
+      tags: [todos]
+      summary: List to-do tasks (staff only)
+      parameters:
+        - name: mine
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: When true, only return tasks assigned to the caller.
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoTask"
+        "403":
+          description: Forbidden
+    post:
+      operationId: createTodo
+      tags: [todos]
+      summary: Create a to-do task (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTodoInput"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoTask"
+        "400":
+          description: Invalid input
+        "403":
+          description: Forbidden
+
+  /todos/customers:
+    get:
+      operationId: listTodoCustomers
+      tags: [todos]
+      summary: List selectable customers for tasks (staff only)
+      responses:
+        "200":
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoCustomer"
+        "403":
+          description: Forbidden
+    post:
+      operationId: createTodoCustomer
+      tags: [todos]
+      summary: Create a customer by name (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTodoCustomerInput"
+      responses:
+        "200":
+          description: Existing customer matched by name
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoCustomer"
+        "201":
+          description: Created customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoCustomer"
+        "400":
+          description: Invalid input
+        "403":
+          description: Forbidden
+
+  /todos/assignees:
+    get:
+      operationId: listTodoAssignees
+      tags: [todos]
+      summary: List assignable staff members (staff only)
+      responses:
+        "200":
+          description: List of staff
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoAssignee"
+        "403":
+          description: Forbidden
+
+  /todos/{id}:
+    patch:
+      operationId: updateTodo
+      tags: [todos]
+      summary: Update a task. Admins edit any field; staff may only change status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTodoInput"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoTask"
+        "400":
+          description: Invalid input
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTodo
+      tags: [todos]
+      summary: Delete a task (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /todos/{id}/comments:
+    get:
+      operationId: listTodoComments
+      tags: [todos]
+      summary: List comments on a task (staff only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoComment"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    post:
+      operationId: createTodoComment
+      tags: [todos]
+      summary: Add a comment to a task (staff only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTodoCommentInput"
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoComment"
+        "400":
+          description: Invalid input
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+components:
+  schemas:
+    EngineeringSpace:
+      type: object
+      required: [schedulerStatus, notionSchedulerStatus, agents, requests]
+      properties:
+        schedulerStatus:
+          $ref: "#/components/schemas/PaperclipSchedulerStatus"
+        notionSchedulerStatus:
+          $ref: "#/components/schemas/PaperclipSchedulerStatus"
+        agents:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaperclipAgent"
+        requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/EngineeringSpaceRequest"
+
+    PaperclipSchedulerStatus:
+      type: object
+      required: [configured, pushRunning, pollRunning]
+      properties:
+        configured:
+          type: boolean
+        pushRunning:
+          type: boolean
+        pollRunning:
+          type: boolean
+        lastPushAt:
+          type: ["string", "null"]
+          format: date-time
+        lastPollAt:
+          type: ["string", "null"]
+          format: date-time
+        lastPushError:
+          type: ["string", "null"]
+        lastPollError:
+          type: ["string", "null"]
+
+    PaperclipAgent:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { type: ["string", "null"] }
+        title: { type: ["string", "null"] }
+        icon: { type: ["string", "null"] }
+        status: { type: ["string", "null"] }
+
+    EngineeringSpaceChildTask:
+      type: object
+      required: [id, title, status]
+      properties:
+        id: { type: string }
+        identifier: { type: ["string", "null"] }
+        title: { type: string }
+        status: { type: string }
+        assigneeAgentId: { type: ["string", "null"] }
+
+    EngineeringSpaceRequest:
+      type: object
+      required: [id, title, status, priority, paperclipIssueId, children]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        summary: { type: string }
+        status:
+          type: string
+          enum: [requested, ready_for_execution, planned, in_progress, deployed]
+        priority:
+          type: string
+          enum: [low, medium, high]
+        adminPriorityRank: { type: ["integer", "null"] }
+        engineeringOwner:
+          type: ["string", "null"]
+          enum: [agent, human, null]
+        paperclipIssueId: { type: ["string", "null"] }
+        paperclipIdentifier: { type: ["string", "null"] }
+        paperclipStatus: { type: ["string", "null"] }
+        paperclipPriority: { type: ["string", "null"] }
+        paperclipAssigneeAgentId: { type: ["string", "null"] }
+        paperclipPushedAt:
+          type: ["string", "null"]
+          format: date-time
+        paperclipLastSyncedAt:
+          type: ["string", "null"]
+          format: date-time
+        paperclipPushError: { type: ["string", "null"] }
+        notionPageId: { type: ["string", "null"] }
+        notionUrl: { type: ["string", "null"] }
+        notionStatus: { type: ["string", "null"] }
+        notionAssignee: { type: ["string", "null"] }
+        notionPushedAt:
+          type: ["string", "null"]
+          format: date-time
+        notionLastSyncedAt:
+          type: ["string", "null"]
+          format: date-time
+        notionPushError: { type: ["string", "null"] }
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/EngineeringSpaceChildTask"
+
+    EngineeringSpaceRefreshAck:
+      type: object
+      required: [push, poll, schedulerStatus]
+      properties:
+        push: { type: string, enum: [started, busy] }
+        poll: { type: string, enum: [started, busy] }
+        notion:
+          type: object
+          properties:
+            push: { type: string, enum: [started, busy] }
+            poll: { type: string, enum: [started, busy] }
+        schedulerStatus:
+          $ref: "#/components/schemas/PaperclipSchedulerStatus"
+        notionSchedulerStatus:
+          $ref: "#/components/schemas/PaperclipSchedulerStatus"
+
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    Me:
+      type: object
+      required: [id, email, isAdmin, isEngineer]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: ["string", "null"]
+        isAdmin:
+          type: boolean
+        isEngineer:
+          type: boolean
+
+    CreateConversationInput:
+      type: object
+      properties:
+        minor:
+          type: boolean
+          description: >-
+            When true, file this as a "Minor" quick request (small bug/feature).
+            The intake bot asks at most one clarifying question, then finalizes.
+
+    ConversationSummary:
+      type: object
+      required: [id, title, status, minor, createdAt, updatedAt, messageCount]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+          enum: [active, finalized]
+        minor:
+          type: boolean
+          description: Filed via the "Minor" quick-report path.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        messageCount:
+          type: integer
+        featureRequestId:
+          type: ["integer", "null"]
+
+    Message:
+      type: object
+      required: [id, role, content, createdAt, attachments]
+      properties:
+        id:
+          type: integer
+        role:
+          type: string
+          enum: [user, assistant, admin]
+        authorName:
+          type: ["string", "null"]
+          description: For admin messages, the name/email of the admin who posted
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+
+    Attachment:
+      type: object
+      required: [id, filename, mimeType, sizeBytes, createdAt]
+      properties:
+        id:
+          type: integer
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    Conversation:
+      type: object
+      required: [id, title, status, minor, createdAt, updatedAt, messages, pendingAttachments]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+          enum: [active, finalized]
+        minor:
+          type: boolean
+          description: Filed via the "Minor" quick-report path.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        featureRequestId:
+          type: ["integer", "null"]
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        pendingAttachments:
+          type: array
+          description: Attachments uploaded but not yet attached to a sent message
+          items:
+            $ref: "#/components/schemas/Attachment"
+
+    AdminMessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+
+    MessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+        attachmentIds:
+          type: array
+          items:
+            type: integer
+
+    AttachmentInput:
+      type: object
+      required: [filename, mimeType, dataBase64]
+      properties:
+        filename:
+          type: string
+          minLength: 1
+        mimeType:
+          type: string
+          minLength: 1
+        dataBase64:
+          type: string
+          description: Base64-encoded file contents (max ~5MB)
+          minLength: 1
+
+    FeatureRequest:
+      type: object
+      required:
+        - id
+        - userId
+        - userEmail
+        - title
+        - summary
+        - problem
+        - benefits
+        - currentSpend
+        - scope
+        - status
+        - priority
+        - createdAt
+        - updatedAt
+        - conversationId
+        - minor
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        userEmail:
+          type: string
+        userName:
+          type: ["string", "null"]
+        title:
+          type: string
+        summary:
+          type: string
+        problem:
+          type: string
+          description: Why this is a problem for the customer
+        benefits:
+          type: string
+          description: Benefits/value the feature delivers
+        currentSpend:
+          type: string
+          description: Money/time the customer spends today on this problem
+        scope:
+          type: string
+          description: Full scoped requirements as Markdown
+        status:
+          type: string
+          enum: [requested, ready_for_execution, planned, in_progress, deployed]
+        priority:
+          type: string
+          enum: [low, medium, high]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        conversationId:
+          type: integer
+        minor:
+          type: boolean
+          description: Filed via the "Minor" quick-report path (small bug/feature).
+        aiPriorityRank:
+          type: ["integer", "null"]
+          description: 1-based rank assigned by the periodic AI prioritization job (only set for "requested" items in the most recent run).
+        aiPriorityRationale:
+          type: ["string", "null"]
+          description: Short explanation of why this request received its AI rank.
+        aiPriorityGeneratedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: When the current AI rank was generated.
+        relatedRequestIds:
+          type: ["array", "null"]
+          description: Admin-only. Ids of other feature requests this looks like a near-duplicate of or strongly clusters with. Surface only in admin UIs.
+          items:
+            type: integer
+        clusterRationale:
+          type: ["string", "null"]
+          description: Admin-only. Short explanation of how this request relates to the items in relatedRequestIds. Never shown to the requesting customer.
+        adminPriorityRank:
+          type: ["integer", "null"]
+          description: Admin-only. Manual 1-based rank set by an admin when moving a request to "Planned". Lower = higher priority. Used to order the backlog fed to the external dev agent. Defaults to the AI rank but can be overridden.
+        paperclipIssueId:
+          type: ["string", "null"]
+          description: Admin-only. ID of the Paperclip issue created for this request, or null if not yet pushed.
+        paperclipIdentifier:
+          type: ["string", "null"]
+          description: Admin-only. Human-readable Paperclip identifier (e.g. "PUL-23").
+        paperclipStatus:
+          type: ["string", "null"]
+          description: Admin-only. Latest Paperclip status (open/in_progress/in_review/done/cancelled/...).
+        paperclipPushedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Admin-only. When this request was first pushed to Paperclip.
+        paperclipLastSyncedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Admin-only. When the Paperclip snapshot was last refreshed by the poller.
+        paperclipPushError:
+          type: ["string", "null"]
+          description: Admin-only. Last push error message, if the most recent push attempt failed.
+        engineeringOwner:
+          type: ["string", "null"]
+          enum: [agent, human, null]
+          description: Admin-only. Engineering destination chosen at plan-time. "agent" routes to Paperclip + the dev-agent queue; "human" routes to Notion only. null = not yet routed (legacy rows are treated as agent-eligible).
+        notionPageId:
+          type: ["string", "null"]
+          description: Admin-only. ID of the Notion page created for this human-routed request, or null if not yet pushed.
+        notionUrl:
+          type: ["string", "null"]
+          description: Admin-only. Direct URL to the Notion page.
+        notionStatus:
+          type: ["string", "null"]
+          description: Admin-only. Latest Notion Status value (e.g. Unpicked / In progress / Done).
+        notionAssignee:
+          type: ["string", "null"]
+          description: Admin-only. Display name of the human assignee synced from Notion, if any.
+        notionPushedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Admin-only. When this request was first pushed to Notion.
+        notionLastSyncedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Admin-only. When the Notion snapshot was last refreshed by the poller.
+        notionPushError:
+          type: ["string", "null"]
+          description: Admin-only. Last Notion push error message, if the most recent push attempt failed.
+
+    FeatureRequestUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [requested, ready_for_execution, planned, in_progress, deployed]
+        priority:
+          type: string
+          enum: [low, medium, high]
+        adminPriorityRank:
+          type: ["integer", "null"]
+          description: Admin-set priority rank for the Planned backlog. Pass null to clear.
+          minimum: 1
+        engineeringOwner:
+          type: ["string", "null"]
+          enum: [agent, human, null]
+          description: Admin-only. Engineering destination set when moving a request to "Planned". "agent" → Paperclip + dev-agent queue; "human" → Notion only.
+
+    FeatureRequestVersion:
+      type: object
+      required:
+        - id
+        - featureRequestId
+        - versionNumber
+        - title
+        - summary
+        - problem
+        - benefits
+        - currentSpend
+        - scope
+        - priority
+        - changeReason
+        - createdAt
+      properties:
+        id:
+          type: integer
+        featureRequestId:
+          type: integer
+        versionNumber:
+          type: integer
+        title:
+          type: string
+        summary:
+          type: string
+        problem:
+          type: string
+        benefits:
+          type: string
+        currentSpend:
+          type: string
+        scope:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+        changeReason:
+          type: string
+        createdByUserId:
+          type: ["string", "null"]
+        createdByName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminStats:
+      type: object
+      required: [total, byStatus, byPriority, recentlyCreated]
+      properties:
+        total:
+          type: integer
+        byStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusCount"
+        byPriority:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriorityCount"
+        recentlyCreated:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeatureRequest"
+
+    AiPrioritization:
+      type: object
+      required: [items, isRunning]
+      properties:
+        generatedAt:
+          type: ["string", "null"]
+          format: date-time
+          description: When the most recent ranking was generated; null if it has never run.
+        nextRunAt:
+          type: ["string", "null"]
+          format: date-time
+          description: When the next scheduled auto-run will fire.
+        isRunning:
+          type: boolean
+          description: True while a ranking run is in progress. Clients should poll until this flips to false.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiPriorityItem"
+
+    AiPriorityItem:
+      type: object
+      required:
+        - featureRequestId
+        - rank
+        - rationale
+        - title
+        - summary
+        - status
+        - priority
+        - userEmail
+        - createdAt
+      properties:
+        featureRequestId:
+          type: integer
+        rank:
+          type: integer
+        rationale:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        status:
+          type: string
+          enum: [requested, ready_for_execution, planned, in_progress, deployed]
+        priority:
+          type: string
+          enum: [low, medium, high]
+        userEmail:
+          type: string
+        userName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    StatusCount:
+      type: object
+      required: [status, count]
+      properties:
+        status:
+          type: string
+        count:
+          type: integer
+
+    PriorityCount:
+      type: object
+      required: [priority, count]
+      properties:
+        priority:
+          type: string
+        count:
+          type: integer
+
+    UserSummary:
+      type: object
+      required: [id, email, isAdmin, isEngineer]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: ["string", "null"]
+        isAdmin:
+          type: boolean
+        isEngineer:
+          type: boolean
+
+    TeamRole:
+      type: string
+      enum: [admin, engineer]
+
+    TeamMemberInput:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+        role:
+          $ref: "#/components/schemas/TeamRole"
+        note:
+          type: ["string", "null"]
+
+    TeamMember:
+      type: object
+      required: [id, email, role, createdAt]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        role:
+          $ref: "#/components/schemas/TeamRole"
+        note:
+          type: ["string", "null"]
+        addedByName:
+          type: ["string", "null"]
+        addedByEmail:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    TodoStatus:
+      type: string
+      enum: [todo, in_progress, done]
+
+    TodoCustomer:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    TodoAssignee:
+      type: object
+      required: [id, name, email]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+
+    TodoTask:
+      type: object
+      required:
+        [id, title, status, commentCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        details:
+          type: ["string", "null"]
+        status:
+          $ref: "#/components/schemas/TodoStatus"
+        customerId:
+          type: ["integer", "null"]
+        customerName:
+          type: ["string", "null"]
+        assigneeUserId:
+          type: ["string", "null"]
+        assigneeName:
+          type: ["string", "null"]
+        assigneeEmail:
+          type: ["string", "null"]
+        createdByUserId:
+          type: ["string", "null"]
+        commentCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TodoComment:
+      type: object
+      required: [id, taskId, body, createdAt]
+      properties:
+        id:
+          type: integer
+        taskId:
+          type: integer
+        body:
+          type: string
+        authorUserId:
+          type: ["string", "null"]
+        authorName:
+          type: ["string", "null"]
+        authorEmail:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateTodoInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        details:
+          type: ["string", "null"]
+        status:
+          $ref: "#/components/schemas/TodoStatus"
+        customerId:
+          type: ["integer", "null"]
+        customerName:
+          type: ["string", "null"]
+        assigneeUserId:
+          type: ["string", "null"]
+
+    UpdateTodoInput:
+      type: object
+      properties:
+        title:
+          type: string
+        details:
+          type: ["string", "null"]
+        status:
+          $ref: "#/components/schemas/TodoStatus"
+        customerId:
+          type: ["integer", "null"]
+        customerName:
+          type: ["string", "null"]
+        assigneeUserId:
+          type: ["string", "null"]
+
+    CreateTodoCustomerInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    CreateTodoCommentInput:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+
+    EngineeringTask:
+      type: object
+      required:
+        - id
+        - featureRequestId
+        - title
+        - description
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+        featureRequestId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [backlog, todo, in_progress, in_review, done, cancelled]
+        assigneeUserId:
+          type: ["string", "null"]
+        assigneeName:
+          type: ["string", "null"]
+        assigneeEmail:
+          type: ["string", "null"]
+        githubRepo:
+          type: ["string", "null"]
+        githubBranch:
+          type: ["string", "null"]
+        githubPrNumber:
+          type: ["integer", "null"]
+        githubPrUrl:
+          type: ["string", "null"]
+        githubPrState:
+          type: ["string", "null"]
+        githubPrStateUpdatedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdByUserId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    EngineeringTaskInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        status:
+          type: string
+          enum: [backlog, todo, in_progress, in_review, done, cancelled]
+        assigneeUserId:
+          type: ["string", "null"]
+
+    EngineeringTaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        status:
+          type: string
+          enum: [backlog, todo, in_progress, in_review, done, cancelled]
+        assigneeUserId:
+          type: ["string", "null"]
+        githubRepo:
+          type: ["string", "null"]
+        githubBranch:
+          type: ["string", "null"]
+        githubPrNumber:
+          type: ["integer", "null"]
+        githubPrUrl:
+          type: ["string", "null"]
+
+    EngineeringTaskMessage:
+      type: object
+      required: [id, taskId, role, content, createdAt]
+      properties:
+        id:
+          type: integer
+        taskId:
+          type: integer
+        role:
+          type: string
+          enum: [engineer, assistant]
+        content:
+          type: string
+        authorUserId:
+          type: ["string", "null"]
+        authorName:
+          type: ["string", "null"]
+        draftId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    EngineeringTaskMessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+
+    CustomerQuestionDraft:
+      type: object
+      required:
+        - id
+        - featureRequestId
+        - conversationId
+        - draftContent
+        - status
+        - createdAt
+      properties:
+        id:
+          type: integer
+        featureRequestId:
+          type: integer
+        taskId:
+          type: ["integer", "null"]
+        conversationId:
+          type: integer
+        proposedByUserId:
+          type: ["string", "null"]
+        proposedByName:
+          type: ["string", "null"]
+        draftContent:
+          type: string
+        contextNote:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        reviewedByUserId:
+          type: ["string", "null"]
+        reviewedByName:
+          type: ["string", "null"]
+        reviewedAt:
+          type: ["string", "null"]
+          format: date-time
+        postedMessageId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    CustomerQuestionDraftApproval:
+      type: object
+      properties:
+        editedContent:
+          type: string
+          description: Optional edited version of the question to post instead of the draft
+
+    GithubRepo:
+      type: object
+      required: [fullName, name, private, htmlUrl, defaultBranch]
+      properties:
+        fullName: { type: string }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        private: { type: boolean }
+        htmlUrl: { type: string }
+        defaultBranch: { type: string }
+        updatedAt: { type: ["string", "null"], format: date-time }
+
+    GithubBranch:
+      type: object
+      required: [name, protected, sha]
+      properties:
+        name: { type: string }
+        protected: { type: boolean }
+        sha: { type: string }
+
+    GithubPull:
+      type: object
+      required: [number, title, state, merged, htmlUrl, headRef, baseRef, updatedAt]
+      properties:
+        number: { type: integer }
+        title: { type: string }
+        state: { type: string, enum: [open, closed] }
+        merged: { type: boolean }
+        htmlUrl: { type: string }
+        headRef: { type: string }
+        baseRef: { type: string }
+        updatedAt: { type: string, format: date-time }
+
+    GithubError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        status: { type: ["integer", "null"] }

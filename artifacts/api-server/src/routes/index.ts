@@ -1,0 +1,44 @@
+import { Router, type IRouter } from "express";
+import healthRouter from "./health";
+import meRouter from "./me";
+import conversationsRouter from "./conversations";
+import featureRequestsRouter from "./featureRequests";
+import adminRouter from "./admin";
+import engineeringRouter from "./engineering";
+import teamRouter from "./team";
+import githubRouter from "./github";
+import integrationsRouter from "./integrations";
+import paperclipRouter from "./paperclip";
+import transcribeRouter from "./transcribe";
+import emailCampaignsRouter from "./emailCampaigns";
+import aiEmailRouter from "./aiEmail";
+import customersRouter from "./customers";
+import crmRouter from "./crm";
+import attachmentsRouter from "./attachments";
+import mergeProposalsRouter from "./merge-proposals";
+import todosRouter from "./todos";
+import authRouter from "./auth";
+
+const router: IRouter = Router();
+
+router.use(authRouter);
+router.use(healthRouter);
+router.use(meRouter);
+router.use(conversationsRouter);
+router.use(featureRequestsRouter);
+router.use(adminRouter);
+router.use(engineeringRouter);
+router.use(teamRouter);
+router.use(githubRouter);
+router.use(integrationsRouter);
+router.use(paperclipRouter);
+router.use(transcribeRouter);
+router.use(emailCampaignsRouter);
+router.use(aiEmailRouter);
+router.use(customersRouter);
+router.use(crmRouter);
+router.use(attachmentsRouter);
+router.use(mergeProposalsRouter);
+router.use(todosRouter);
+
+export default router;
